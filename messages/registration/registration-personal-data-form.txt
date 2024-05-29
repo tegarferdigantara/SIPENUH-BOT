@@ -1,0 +1,15 @@
+[Pendaftaran Umrah - Data Diri] ⁽¹⁻³⁾
+1. Nama Lengkap: 
+2. Jenis Kelamin: 
+3. Tempat Lahir: 
+4. Tanggal Lahir: 
+5. Pekerjaan: 
+6. Alamat: 
+7. Provinsi: 
+8. Kota: 
+9. Kecamatan: 
+10. Nama Ayah: 
+11. Nama Ibu: 
+12. Nomor HP Keluarga (Boleh dikosongkan): 
+13. Email (Boleh dikosongkan): 
+14. Pilih Nomor Paket Umrah dibawah ini (Cth Isi = 1): 

@@ -1,0 +1,29 @@
+{
+  "name": "sipenuh",
+  "version": "1.0.0",
+  "description": "Sistem Informasi Pendaftaran Umrah",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ."
+  },
+  "keywords": [
+    "nodejs",
+    "whatsapp-web.js"
+  ],
+  "author": "TEFD",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "change-case": "^5.4.4",
+    "colors": "^1.4.0",
+    "dot-env": "^0.0.1",
+    "dotenv": "^16.4.5",
+    "ffmpeg": "^0.0.4",
+    "form-data": "^4.0.0",
+    "fs": "^0.0.1-security",
+    "moment-timezone": "^0.5.37",
+    "nodemon": "^3.1.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.1-alpha.5"
+  }
+}

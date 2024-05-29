@@ -1,0 +1,18 @@
+Selanjutnya, silakan kirim foto-foto dokumen berikut untuk melengkapi pendaftaran Anda:
+
+[Pendaftaran Umrah - Unggah Dokumen] ⁽³⁻³⁾
+- Foto Diri (kirim foto dengan caption "foto diri")
+- Foto KTP (kirim foto dengan caption "foto ktp")
+- Foto KK (kirim foto dengan caption "foto kk")
+- Foto Paspor (kirim foto dengan caption "foto paspor")
+- Foto Akte Kelahiran (kirim foto dengan caption "foto akte")
+
+⚠ *Jika Anda tidak memiliki salah satu foto diatas, Anda dapat mengirimkan pesan dengan format:*
+1. Jika Anda tidak memiliki Foto Diri
+- [Ketik: *!skip-foto diri*]
+2. Jika Anda tidak memiliki Foto KTP
+- [Ketik: *!skip-foto ktp*]
+3. Jika Anda tidak memiliki Foto KK
+- [Ketik: *!skip-foto kk*]
+4. Jika Anda tidak memiliki Foto Paspor
+- [Ketik: *!skip-foto paspor*]
