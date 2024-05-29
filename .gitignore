@@ -106,3 +106,7 @@ dist
 
 #Auth Sessions
 *.wwebjs_auth
+
+#js 
+example.js
+stickerscript.js
