@@ -69,7 +69,7 @@ class WhatsAppService {
         city: null,
         province: null,
         profession: null,
-        umrahPackageType: null,
+        umrahPackageNumber: null,
         price: null,
         passportNumber: null,
         idNumber: null,

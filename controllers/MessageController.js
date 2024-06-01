@@ -1,10 +1,11 @@
-const axios = require("axios");
+const { post, patch } = require("axios");
 const moment = require("moment");
-const fs = require("fs");
-const FormData = require("form-data");
+const { writeFile } = require("fs");
 const sendFormatMessage = require("../utils/sendFormatMessage");
-const axiosGet = require("../utils/axiosGet");
-const extractPhotoTypeFromCaption = require("../utils/extractPhotoTypeFromCaption");
+const axiosGet = require("../utils/api/axiosGet");
+const { extractPhotoTypeFromCaption } = require("../utils/photoTypeExtractor");
+const { sendPhotoUploadedMessage } = require("../utils/api/photoUploadStatus");
+
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
 
@@ -46,6 +47,8 @@ class MessageController {
         message.from,
         "./messages/menu/main.txt"
       );
+
+      this.client.sendMessage(message.from, messages);
     } catch {
       this.client.sendMessage(message.from, "error");
     }
@@ -127,7 +130,7 @@ class MessageController {
       };
 
       console.log(dataPendaftaran);
-      const response = await axios.post(`${urlApi}/register`, dataPendaftaran, {
+      const response = await post(`${urlApi}/register`, dataPendaftaran, {
         headers: {
           Authorization: apiKey,
         },
@@ -145,7 +148,7 @@ class MessageController {
       this.userStatus[this.userId].province = response.data.data.province;
       this.userStatus[this.userId].profession = response.data.data.profession;
       this.userStatus[this.userId].profession = response.data.data.profession;
-      this.userStatus[this.userId].umrahPackageType =
+      this.userStatus[this.userId].umrahPackageNumber =
         response.data.data.umrah_package_id;
       this.userStatus[this.userId].registrationNumber =
         response.data.data.registration_number;
@@ -162,7 +165,7 @@ class MessageController {
         family_card_photo: null,
       };
 
-      const responseNomorDokumen = await axios.post(
+      const responseNomorDokumen = await post(
         `${urlApi}/register/document`,
         dataPendaftaranNomorDokumen,
         {
@@ -230,7 +233,7 @@ class MessageController {
         family_card_photo: null,
       };
 
-      const response = await axios.patch(
+      const response = await patch(
         `${urlApi}/register/document/${
           this.userStatus[this.userId].documentId
         }`,
@@ -242,11 +245,11 @@ class MessageController {
         }
       );
 
-      console.log("data dokument", response.data.data);
-
       this.userStatus[this.userId].passportNumber =
         response.data.data.passport_number;
       this.userStatus[this.userId].idNumber = response.data.data.id_number;
+
+      console.log(this.userStatus[this.userId]);
 
       await sendFormatMessage(
         this.client,
@@ -271,7 +274,6 @@ class MessageController {
     const [command, caption] = message.body.split(" ");
 
     const photoType = await extractPhotoTypeFromCaption(caption);
-    console.log(photoType);
     if (photoType in this.userStatus[this.userId].photoUploadStatus) {
       this.userStatus[this.userId].photoUploadStatus[photoType] = true;
       const allPhotosHandled = Object.values(
@@ -279,10 +281,25 @@ class MessageController {
       ).every((status) => status === true);
       console.log(this.userStatus[this.userId]);
       if (allPhotosHandled) {
-        await sendFormatMessage(
+        const userStatus = this.userStatus[this.userId];
+        await outroRegistrationResponse(
           this.client,
           message.from,
-          "./messages/registration/outro.txt"
+          urlApi,
+          apiKey,
+          userStatus.fullName,
+          userStatus.placeOfBirth,
+          userStatus.dateOfBirth,
+          userStatus.gender,
+          userStatus.address,
+          userStatus.subdistrict,
+          userStatus.city,
+          userStatus.province,
+          userStatus.profession,
+          userStatus.umrahPackageNumber,
+          userStatus.passportNumber,
+          userStatus.idNumber,
+          userStatus.registrationNumber
         );
         delete this.userStatus[this.userId];
       }
@@ -298,8 +315,8 @@ class MessageController {
     const photoType = await extractPhotoTypeFromCaption(caption);
     if (photoType !== null) {
       const fileName = `${message.from}-${photoType}.jpg`;
-      const filePath = `messages/${fileName}`;
-      fs.writeFile(filePath, media.data, "base64", (err) => {
+      const filePath = `media/photos/${fileName}`;
+      writeFile(filePath, media.data, "base64", (err) => {
         if (err) {
           console.error("Gagal menyimpan foto:", err);
         } else {
@@ -311,14 +328,34 @@ class MessageController {
             photoType
           );
           this.userStatus[this.userId].photoUploadStatus[photoType] = true;
+
+          // Memberikan umpan balik kepada pengguna
+          sendPhotoUploadedMessage(this.client, message.from, photoType);
+
+          // Memeriksa apakah semua foto telah diunggah
           const allPhotosHandled = Object.values(
             this.userStatus[this.userId].photoUploadStatus
           ).every((status) => status === true);
           if (allPhotosHandled) {
-            sendFormatMessage(
+            const userStatus = this.userStatus[this.userId];
+            outroRegistrationResponse(
               this.client,
               message.from,
-              "./messages/registration/outro.txt"
+              urlApi,
+              apiKey,
+              userStatus.fullName,
+              userStatus.placeOfBirth,
+              userStatus.dateOfBirth,
+              userStatus.gender,
+              userStatus.address,
+              userStatus.subdistrict,
+              userStatus.city,
+              userStatus.province,
+              userStatus.profession,
+              userStatus.umrahPackageNumber,
+              userStatus.passportNumber,
+              userStatus.idNumber,
+              userStatus.registrationNumber
             );
             delete this.userStatus[this.userId];
           }
@@ -332,7 +369,7 @@ class MessageController {
   }
 
   async handleUmrahPackage(message) {
-    const datas = await axiosGet(`${urlApi}/umrah-package`, apiKey);
+    const datas = await axiosGet(`${urlApi}/umrah-packages`, apiKey);
     const packages = datas.data;
 
     let messageBody = `🕋 Selamat Datang di Layanan Paket Umrah Kami! 🕋\n\nMari Memilih Paket Umrah yang Cocok untuk Anda:\n\n`;
@@ -396,32 +433,6 @@ class MessageController {
       );
     } catch {
       client.sendMessage(message.from, "error");
-    }
-  }
-
-  async uploadPhoto(filePath, urlApi, apiKey, documentId, photoType) {
-    try {
-      const fileStream = fs.createReadStream(filePath);
-      const formData = new FormData();
-      formData.append(photoType, fileStream);
-
-      const config = {
-        headers: {
-          ...formData.getHeaders(),
-          Authorization: apiKey,
-        },
-      };
-
-      const response = await axios.post(
-        `${urlApi}/register/document/${documentId}`,
-        formData,
-        config
-      );
-      console.log(response.data);
-      return response.data;
-    } catch (error) {
-      console.log(filePath);
-      console.log(error);
     }
   }
 }
