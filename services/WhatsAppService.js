@@ -57,9 +57,9 @@ class WhatsAppService {
   }
 
   async onMessageReceived(message) {
-    const userId = message.from;
-    if (!this.userStatus[userId]) {
-      this.userStatus[userId] = {
+    const userNumber = message.from;
+    if (!this.userStatus[userNumber]) {
+      this.userStatus[userNumber] = {
         fullName: null,
         placeOfBirth: null,
         dateOfBirth: null,
@@ -96,7 +96,7 @@ class WhatsAppService {
 
     const messageController = new MessageController(
       this.client,
-      userId,
+      userNumber,
       this.userStatus
     );
     await messageController.handleMessage(message);

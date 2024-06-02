@@ -3,16 +3,25 @@ const moment = require("moment");
 const { writeFile } = require("fs");
 const sendFormatMessage = require("../utils/sendFormatMessage");
 const axiosGet = require("../utils/api/axiosGet");
-const { extractPhotoTypeFromCaption } = require("../utils/photoTypeExtractor");
-const { sendPhotoUploadedMessage } = require("../utils/api/photoUploadStatus");
+const {
+  extractPhotoTypeFromCaption,
+  extractPhotoTypeFromText,
+} = require("../utils/photoTypeExtractor");
+const {
+  uploadPhoto,
+  getNextPhotoType,
+} = require("../utils/api/photoUploadStatus");
+const {
+  outroRegistrationResponse,
+} = require("../utils/api/outroRegistrationResponse");
 
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
 
 class MessageController {
-  constructor(client, userId, userStatus) {
+  constructor(client, userNumber, userStatus) {
     this.client = client;
-    this.userId = userId;
+    this.userNumber = userNumber;
     this.userStatus = userStatus;
   }
 
@@ -136,26 +145,30 @@ class MessageController {
         },
       });
 
-      this.userStatus[this.userId].registrationId = response.data.data.id;
-      this.userStatus[this.userId].fullName = response.data.data.full_name;
-      this.userStatus[this.userId].placeOfBirth =
+      this.userStatus[this.userNumber].registrationId = response.data.data.id;
+      this.userStatus[this.userNumber].fullName = response.data.data.full_name;
+      this.userStatus[this.userNumber].placeOfBirth =
         response.data.data.birth_place;
-      this.userStatus[this.userId].dateOfBirth = response.data.data.birth_date;
-      this.userStatus[this.userId].gender = response.data.data.gender;
-      this.userStatus[this.userId].address = response.data.data.address;
-      this.userStatus[this.userId].subdistrict = response.data.data.subdistrict;
-      this.userStatus[this.userId].city = response.data.data.city;
-      this.userStatus[this.userId].province = response.data.data.province;
-      this.userStatus[this.userId].profession = response.data.data.profession;
-      this.userStatus[this.userId].profession = response.data.data.profession;
-      this.userStatus[this.userId].umrahPackageNumber =
+      this.userStatus[this.userNumber].dateOfBirth =
+        response.data.data.birth_date;
+      this.userStatus[this.userNumber].gender = response.data.data.gender;
+      this.userStatus[this.userNumber].address = response.data.data.address;
+      this.userStatus[this.userNumber].subdistrict =
+        response.data.data.subdistrict;
+      this.userStatus[this.userNumber].city = response.data.data.city;
+      this.userStatus[this.userNumber].province = response.data.data.province;
+      this.userStatus[this.userNumber].profession =
+        response.data.data.profession;
+      this.userStatus[this.userNumber].profession =
+        response.data.data.profession;
+      this.userStatus[this.userNumber].umrahPackageNumber =
         response.data.data.umrah_package_id;
-      this.userStatus[this.userId].registrationNumber =
+      this.userStatus[this.userNumber].registrationNumber =
         response.data.data.registration_number;
 
-      console.log(this.userStatus[this.userId]);
+      console.log(this.userStatus[this.userNumber]);
       const dataPendaftaranNomorDokumen = {
-        consumer_id: this.userStatus[this.userId].registrationId,
+        consumer_id: this.userStatus[this.userNumber].registrationId,
         consumer_photo: null,
         passport_number: null,
         passport_photo: null,
@@ -177,7 +190,7 @@ class MessageController {
 
       console.log(responseNomorDokumen.data.data);
 
-      this.userStatus[this.userId].documentId =
+      this.userStatus[this.userNumber].documentId =
         responseNomorDokumen.data.data.id;
 
       await sendFormatMessage(
@@ -223,7 +236,7 @@ class MessageController {
       });
 
       const dataPendaftaran = {
-        consumer_id: this.userStatus[this.userId].registrationId,
+        consumer_id: this.userStatus[this.userNumber].registrationId,
         consumer_photo: null,
         passport_number: dataInput["1. nomor paspor"],
         passport_photo: null,
@@ -235,7 +248,7 @@ class MessageController {
 
       const response = await patch(
         `${urlApi}/register/document/${
-          this.userStatus[this.userId].documentId
+          this.userStatus[this.userNumber].documentId
         }`,
         dataPendaftaran,
         {
@@ -245,11 +258,11 @@ class MessageController {
         }
       );
 
-      this.userStatus[this.userId].passportNumber =
+      this.userStatus[this.userNumber].passportNumber =
         response.data.data.passport_number;
-      this.userStatus[this.userId].idNumber = response.data.data.id_number;
+      this.userStatus[this.userNumber].idNumber = response.data.data.id_number;
 
-      console.log(this.userStatus[this.userId]);
+      console.log(this.userStatus[this.userNumber]);
 
       await sendFormatMessage(
         this.client,
@@ -273,15 +286,16 @@ class MessageController {
   async handleNoPhoto(message) {
     const [command, caption] = message.body.split(" ");
 
-    const photoType = await extractPhotoTypeFromCaption(caption);
-    if (photoType in this.userStatus[this.userId].photoUploadStatus) {
-      this.userStatus[this.userId].photoUploadStatus[photoType] = true;
+    const photoType = extractPhotoTypeFromCaption(caption.toLowerCase());
+    if (photoType in this.userStatus[this.userNumber].photoUploadStatus) {
+      this.userStatus[this.userNumber].photoUploadStatus[photoType] = true;
+
       const allPhotosHandled = Object.values(
-        this.userStatus[this.userId].photoUploadStatus
+        this.userStatus[this.userNumber].photoUploadStatus
       ).every((status) => status === true);
-      console.log(this.userStatus[this.userId]);
+      console.log(this.userStatus[this.userNumber]);
       if (allPhotosHandled) {
-        const userStatus = this.userStatus[this.userId];
+        const userStatus = this.userStatus[this.userNumber];
         await outroRegistrationResponse(
           this.client,
           message.from,
@@ -301,7 +315,15 @@ class MessageController {
           userStatus.idNumber,
           userStatus.registrationNumber
         );
-        delete this.userStatus[this.userId];
+        delete this.userStatus[this.userNumber];
+      } else {
+        const nextPhotoType = await getNextPhotoType(
+          this.userStatus,
+          this.userNumber
+        );
+        const typeConvert = extractPhotoTypeFromText(photoType);
+        const skipMessage = `Anda telah meng-skip *${typeConvert}*. Mohon unggah *${nextPhotoType}* berikutnya.`;
+        this.client.sendMessage(message.from, skipMessage);
       }
     } else {
       this.client.sendMessage(message.from, "Jenis foto tidak valid.");
@@ -312,7 +334,7 @@ class MessageController {
     const media = await message.downloadMedia();
     const caption = message.body.toLowerCase();
 
-    const photoType = await extractPhotoTypeFromCaption(caption);
+    const photoType = extractPhotoTypeFromCaption(caption);
     if (photoType !== null) {
       const fileName = `${message.from}-${photoType}.jpg`;
       const filePath = `media/photos/${fileName}`;
@@ -320,45 +342,16 @@ class MessageController {
         if (err) {
           console.error("Gagal menyimpan foto:", err);
         } else {
-          this.uploadPhoto(
+          uploadPhoto(
+            this.client,
+            this.userStatus,
+            message.from,
             filePath,
             urlApi,
             apiKey,
-            this.userStatus[this.userId].documentId,
             photoType
           );
-          this.userStatus[this.userId].photoUploadStatus[photoType] = true;
-
-          // Memberikan umpan balik kepada pengguna
-          sendPhotoUploadedMessage(this.client, message.from, photoType);
-
-          // Memeriksa apakah semua foto telah diunggah
-          const allPhotosHandled = Object.values(
-            this.userStatus[this.userId].photoUploadStatus
-          ).every((status) => status === true);
-          if (allPhotosHandled) {
-            const userStatus = this.userStatus[this.userId];
-            outroRegistrationResponse(
-              this.client,
-              message.from,
-              urlApi,
-              apiKey,
-              userStatus.fullName,
-              userStatus.placeOfBirth,
-              userStatus.dateOfBirth,
-              userStatus.gender,
-              userStatus.address,
-              userStatus.subdistrict,
-              userStatus.city,
-              userStatus.province,
-              userStatus.profession,
-              userStatus.umrahPackageNumber,
-              userStatus.passportNumber,
-              userStatus.idNumber,
-              userStatus.registrationNumber
-            );
-            delete this.userStatus[this.userId];
-          }
+          this.userStatus[this.userNumber].photoUploadStatus[photoType] = true;
         }
       });
     } else {

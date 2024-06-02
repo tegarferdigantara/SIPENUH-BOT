@@ -1,10 +1,11 @@
 Selanjutnya, silakan unggah foto-foto dokumen berikut untuk melengkapi pendaftaran Anda:
 
 [Pendaftaran Umrah - Unggah Dokumen] ⁽³⁻³⁾
-- Foto Diri (kirim foto dengan caption "foto diri") (Wajib)
-- Foto KTP (kirim foto dengan caption "foto ktp") (Wajib)
-- Foto KK (kirim foto dengan caption "foto kk") (Wajib)
-- Foto Paspor (kirim foto dengan caption "foto paspor")
-- Foto Akte Kelahiran (kirim foto dengan caption "foto akte") (Wajib)
+- *Foto Diri* (kirim foto dengan caption "*foto diri*") ⚠ *Wajib*
+- *Foto KTP* (kirim foto dengan caption "*foto ktp*") ⚠ *Wajib*
+- *Foto KK* (kirim foto dengan caption "*foto kk*") ⚠ *Wajib*
+- *Foto Akte* Kelahiran (kirim foto dengan caption "*foto akte*") ⚠ *Wajib*
+- *Foto Paspor* (kirim foto dengan caption "*foto paspor*")
 
-⚠ *Jika Anda tidak memiliki Paspor dan ingin membuat paspor dengan layanan kami, Anda dapat mengirimkan pesan dengan format: !skip-foto paspor*
+⚠ Jika Anda tidak memiliki Paspor dan ingin membuat Paspor dengan layanan kami, Anda dapat mengirimkan pesan dengan format: 
+- [Ketik: *!skip-foto paspor*]
