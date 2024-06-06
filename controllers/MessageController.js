@@ -1,4 +1,4 @@
-const { post, patch } = require("axios");
+const { post, patch, delete: axiosDelete } = require("axios");
 const moment = require("moment");
 const { writeFile } = require("fs");
 const sendFormatMessage = require("../utils/sendFormatMessage");
@@ -26,25 +26,27 @@ class MessageController {
   }
 
   async handleMessage(message) {
-    if (message.body == "!start") {
+    if (message.body.toLowerCase() == "!start") {
       await this.handleStart(message);
-    } else if (message.body == "!daftar-umrah") {
+    } else if (message.body.toLowerCase() == "!daftar-umrah") {
       await this.handleRegistrationStart(message);
+    } else if (message.body.toLowerCase().startsWith("!batal-umrah")) {
+      await this.handleCancelRegistration(message);
     } else if (message.body.includes("[Pendaftaran Umrah - Data Diri]")) {
       await this.handlePersonalData(message);
     } else if (message.body.includes("[Pendaftaran Umrah - Nomor Dokumen]")) {
       await this.handleDocumentData(message);
-    } else if (message.body.startsWith("!skip-foto")) {
+    } else if (message.body.toLowerCase().startsWith("!skip-foto")) {
       await this.handleNoPhoto(message);
     } else if (message.type == "image") {
       await this.handleImageUpload(message);
-    } else if (message.body == "!paket-umrah") {
+    } else if (message.body.toLowerCase() == "!paket-umrah") {
       await this.handleUmrahPackage(message);
-    } else if (message.body.startsWith("!itinerary")) {
+    } else if (message.body.toLowerCase().startsWith("!itinerary")) {
       await this.handleItineraryUmrahPackage(message);
-    } else if (message.body == "!faq") {
+    } else if (message.body.toLowerCase() == "!faq") {
       await this.handleFaq(message);
-    } else if (message.body == "!bantuan") {
+    } else if (message.body.toLowerCase() == "!bantuan") {
       await this.handleCustomerService(message);
     }
   }
@@ -56,8 +58,6 @@ class MessageController {
         message.from,
         "./messages/menu/main.txt"
       );
-
-      this.client.sendMessage(message.from, messages);
     } catch {
       this.client.sendMessage(message.from, "error");
     }
@@ -73,23 +73,32 @@ class MessageController {
       await sendFormatMessage(
         this.client,
         message.from,
-        "./messages/registration/registration-personal-data-form.txt"
+        "./messages/registration/personal-data-form-example.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/personal-data-form.txt"
       );
 
-      const datas = await axiosGet(`${urlApi}/umrah-package`, apiKey);
+      const datas = await axiosGet(`${urlApi}/umrah-packages`, apiKey);
       const packages = datas.data;
 
       let messageBody = `🕋 List Paket Umrah Tersedia: \n\n`;
 
-      packages.forEach((paket) => {
-        messageBody += `*${paket.id}.* Paket *${paket.name}* (${paket.duration} Hari):\n`;
+      packages.forEach((paket, index) => {
+        messageBody += `${index + 1}. Paket *${paket.name}* (Kode Paket: *${
+          paket.id
+        }*):\n`;
+        messageBody += `- Durasi: *${paket.duration} Hari* \n`;
         messageBody += `- Harga: *${new Intl.NumberFormat("id-ID", {
           style: "currency",
           currency: "IDR",
         }).format(paket.price)}*\n`;
-        messageBody += `- Tanggal Berangkat: *${moment(
-          paket.depature_date
-        ).format("DD MMMM YYYY")}*\n`;
+        messageBody += `- Tanggal Berangkat: *${moment(paket.depature_date)
+          .locale("id")
+          .format("DD MMMM YYYY")}*\n`;
+        messageBody += `- Kuota Tersisa: *${paket.quota}* \n`;
       });
 
       this.client.sendMessage(message.from, messageBody);
@@ -100,13 +109,40 @@ class MessageController {
 
   async handlePersonalData(message) {
     try {
+      // Periksa apakah pengguna sudah memiliki pendaftaran yang sedang berlangsung
+      if (
+        this.userStatus[this.userNumber] &&
+        this.userStatus[this.userNumber].registrationId
+      ) {
+        this.client.sendMessage(
+          message.from,
+          "Anda sudah memiliki pendaftaran yang sedang berlangsung. Harap selesaikan pendaftaran tersebut sebelum memulai yang baru."
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-intro.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-form.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-outro.txt"
+        );
+        return;
+      }
+
       const lines = message.body.split("\n");
       const dataInput = {};
       lines.forEach((line) => {
         if (line.includes(":")) {
           const [label, value] = line.split(":");
-          const trimmedLabel = label.trim().toLowerCase(); // Mengubah label menjadi huruf kecil
-          const trimmedValue = value.trim().toLowerCase(); // Mengubah nilai menjadi huruf kecil
+          const trimmedLabel = label.trim().toLowerCase();
+          const trimmedValue = value.trim();
           dataInput[trimmedLabel] = trimmedValue;
         }
       });
@@ -120,10 +156,10 @@ class MessageController {
 
       const dataPendaftaran = {
         full_name: dataInput["1. nama lengkap"],
-        whatsapp_number: message.from.replace("@c.us", ""),
+        whatsapp_number_sender: message.from.replace("@c.us", ""),
         gender: dataInput["2. jenis kelamin"],
         birth_place: dataInput["3. tempat lahir"],
-        birth_date: formatDateId, // Kirimkan tanggal lahir sebagaimana adanya
+        birth_date: formatDateId,
         father_name: dataInput["10. nama ayah"],
         mother_name: dataInput["11. nama ibu"],
         profession: dataInput["5. pekerjaan"],
@@ -131,14 +167,14 @@ class MessageController {
         province: dataInput["7. provinsi"],
         city: dataInput["8. kota"],
         subdistrict: dataInput["9. kecamatan"],
-        family_number: dataInput["12. nomor hp keluarga (boleh dikosongkan)"],
-        email: dataInput["13. email (boleh dikosongkan)"],
-        umrah_package_id: parseInt(
-          dataInput["14. pilih nomor paket umrah dibawah ini (cth isi = 1)"]
-        ),
+        whatsapp_number: dataInput["12. nomor hp (whatsapp)"],
+        family_number: dataInput["13. nomor hp keluarga (boleh dikosongkan)"],
+        email: dataInput["14. email (boleh dikosongkan)"],
+        umrah_package_id: parseInt(dataInput["15. kode paket umrah"]),
       };
 
       console.log(dataPendaftaran);
+
       const response = await post(`${urlApi}/register`, dataPendaftaran, {
         headers: {
           Authorization: apiKey,
@@ -159,14 +195,15 @@ class MessageController {
       this.userStatus[this.userNumber].province = response.data.data.province;
       this.userStatus[this.userNumber].profession =
         response.data.data.profession;
-      this.userStatus[this.userNumber].profession =
-        response.data.data.profession;
+      this.userStatus[this.userNumber].whatsappNumber =
+        response.data.data.whatsapp_number;
       this.userStatus[this.userNumber].umrahPackageNumber =
         response.data.data.umrah_package_id;
       this.userStatus[this.userNumber].registrationNumber =
         response.data.data.registration_number;
 
       console.log(this.userStatus[this.userNumber]);
+
       const dataPendaftaranNomorDokumen = {
         consumer_id: this.userStatus[this.userNumber].registrationId,
         consumer_photo: null,
@@ -193,31 +230,39 @@ class MessageController {
       this.userStatus[this.userNumber].documentId =
         responseNomorDokumen.data.data.id;
 
+      console.log(this.userStatus);
+
       await sendFormatMessage(
         this.client,
         message.from,
-        "./messages/registration/registration-document-number-form-intro.txt"
+        "./messages/registration/doc-number-intro.txt"
       );
       await sendFormatMessage(
         this.client,
         message.from,
-        "./messages/registration/registration-document-number-form.txt"
+        "./messages/registration/doc-number-form.txt"
       );
       await sendFormatMessage(
         this.client,
         message.from,
-        "./messages/registration/registration-document-number-form-outro.txt"
+        "./messages/registration/doc-number-outro.txt"
       );
     } catch (error) {
       console.error(error);
-      const errors = error.response.data.errors;
-
-      for (const key in errors) {
-        if (errors.hasOwnProperty(key)) {
-          const errorMessages = errors[key];
-          this.client.sendMessage(message.from, errorMessages.join(", "));
-          console.log(`${errorMessages.join(", ")}`);
+      if (error.response && error.response.data && error.response.data.errors) {
+        const errors = error.response.data.errors;
+        for (const key in errors) {
+          if (errors.hasOwnProperty(key)) {
+            const errorMessages = errors[key];
+            this.client.sendMessage(message.from, errorMessages.join(", "));
+            console.log(`${errorMessages.join(", ")}`);
+          }
         }
+      } else {
+        this.client.sendMessage(
+          message.from,
+          "Terjadi kesalahan pada server. Silakan coba lagi nanti."
+        );
       }
     }
   }
@@ -234,6 +279,14 @@ class MessageController {
           dataInput[trimmedLabel] = trimmedValue;
         }
       });
+
+      if (!dataInput["2. nomor ktp (nik)"]) {
+        await this.client.sendMessage(
+          message.from,
+          `Nomor KTP (NIK) Wajib diisi.`
+        );
+        return;
+      }
 
       const dataPendaftaran = {
         consumer_id: this.userStatus[this.userNumber].registrationId,
@@ -267,7 +320,7 @@ class MessageController {
       await sendFormatMessage(
         this.client,
         message.from,
-        "./messages/registration/registration-document-file-form.txt"
+        "./messages/registration/doc-file-form.txt"
       );
     } catch (error) {
       console.error(error);
@@ -295,25 +348,13 @@ class MessageController {
       ).every((status) => status === true);
       console.log(this.userStatus[this.userNumber]);
       if (allPhotosHandled) {
-        const userStatus = this.userStatus[this.userNumber];
         await outroRegistrationResponse(
           this.client,
-          message.from,
+          this.userStatus,
+          this.userNumber,
+          photoType,
           urlApi,
-          apiKey,
-          userStatus.fullName,
-          userStatus.placeOfBirth,
-          userStatus.dateOfBirth,
-          userStatus.gender,
-          userStatus.address,
-          userStatus.subdistrict,
-          userStatus.city,
-          userStatus.province,
-          userStatus.profession,
-          userStatus.umrahPackageNumber,
-          userStatus.passportNumber,
-          userStatus.idNumber,
-          userStatus.registrationNumber
+          apiKey
         );
         delete this.userStatus[this.userNumber];
       } else {
@@ -345,19 +386,60 @@ class MessageController {
           uploadPhoto(
             this.client,
             this.userStatus,
-            message.from,
+            this.userNumber,
             filePath,
             urlApi,
             apiKey,
             photoType
           );
-          this.userStatus[this.userNumber].photoUploadStatus[photoType] = true;
+          this.userStatus[message.from].photoUploadStatus[photoType] = true;
         }
       });
     } else {
       console.log(
         `${message.from}: Keterangan tidak mencantumkan jenis foto yang dikirim.`
       );
+    }
+  }
+
+  async handleCancelRegistration(message) {
+    const registrationNumber = message.body.split(" ")[1];
+
+    if (!registrationNumber) {
+      this.client.sendMessage(
+        message.from,
+        "Harap sertakan Nomor Registrasi Pendaftaran. \nContoh: *!batal-umrah 2024-1TFLFIWIP*"
+      );
+      return;
+    }
+
+    try {
+      const response = await axiosDelete(
+        `${urlApi}/register/${registrationNumber}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `${apiKey}`,
+          },
+        }
+      );
+
+      if (response.data.data) {
+        this.client.sendMessage(
+          message.from,
+          `Pendaftaran dengan Nomor Registrasi ${registrationNumber} telah berhasil dibatalkan.`
+        );
+      }
+    } catch (error) {
+      const errors = error.response.data.errors;
+
+      for (const key in errors) {
+        if (errors.hasOwnProperty(key)) {
+          const errorMessages = errors[key];
+          this.client.sendMessage(message.from, errorMessages.join(", "));
+          console.log(`${errorMessages.join(", ")}`);
+        }
+      }
     }
   }
 
@@ -368,35 +450,73 @@ class MessageController {
     let messageBody = `🕋 Selamat Datang di Layanan Paket Umrah Kami! 🕋\n\nMari Memilih Paket Umrah yang Cocok untuk Anda:\n\n`;
 
     packages.forEach((paket, index) => {
-      messageBody += `${index + 1}. Paket ${paket.name} 🌙\n`;
+      messageBody += `${index + 1}. Paket ${paket.name} (Kode Paket: ${
+        paket.id
+      })\n`;
       messageBody += `- Deskripsi: ${paket.description}\n`;
       messageBody += `- Durasi: ${paket.duration} hari\n`;
       messageBody += `- Harga: ${new Intl.NumberFormat("id-ID", {
         style: "currency",
         currency: "IDR",
       }).format(paket.price)}\n`;
-      messageBody += `- Tanggal Keberangkatan: ${paket.depature_date}\n`;
+      messageBody += `- Tanggal Keberangkatan: ${moment(paket.depature_date)
+        .locale("id")
+        .format("DD MMMM YYYY")}\n`;
       messageBody += `- Fasilitas: ${paket.facility}\n`;
       messageBody += `- Tujuan: ${paket.destination}\n`;
       messageBody += `- Kuota: ${paket.quota}\n`;
     });
 
-    messageBody += `Jangan ragu untuk menghubungi kami di nomor berikut untuk informasi lebih lanjut atau melakukan pemesanan: +628123456789.\n\n`;
-    messageBody += `Semoga perjalanan ibadah Anda menjadi pengalaman yang tak terlupakan! 🙏`;
+    messageBody += `Untuk melakukan pemesanan anda dapat dengan mudah mengetik *!daftar-umrah*.\n\n`;
+    messageBody += `Informasi lebih lanjut hubungi `;
 
     this.client.sendMessage(message.from, messageBody);
   }
 
   async handleItineraryUmrahPackage(message) {
-    const packageId = message.body.split(" ")[1];
-    if (packageId) {
-      try {
-      } catch (error) {}
-    } else {
+    const umrahPackageNumber = message.body.split(" ")[1];
+    console.log(umrahPackageNumber);
+
+    if (!umrahPackageNumber) {
       this.client.sendMessage(
         message.from,
         "Harap sertakan ID/Nomor paket. Contoh: *!itinerary 1*"
       );
+      return;
+    }
+
+    try {
+      const datas = await axiosGet(
+        `${urlApi}/itineraries/${umrahPackageNumber}`,
+        apiKey
+      );
+      const itineraries = datas.data;
+
+      if (itineraries.length === 0) {
+        this.client.sendMessage(
+          message.from,
+          "Itinerary belum tersedia untuk paket ini."
+        );
+        return;
+      }
+
+      let messageBody = `*Itinerary untuk Paket Umrah Nomor ${umrahPackageNumber}*\n\n`;
+      itineraries.forEach((itinerary) => {
+        messageBody += `Tanggal: *${itinerary.date}*\n`;
+        messageBody += `Kegiatan: ${itinerary.activity}\n\n`;
+      });
+
+      this.client.sendMessage(message.from, messageBody);
+    } catch (error) {
+      const errors = error.response.data.errors;
+
+      for (const key in errors) {
+        if (errors.hasOwnProperty(key)) {
+          const errorMessages = errors[key];
+          this.client.sendMessage(message.from, errorMessages.join(", "));
+          console.log(`${errorMessages.join(", ")}`);
+        }
+      }
     }
   }
 

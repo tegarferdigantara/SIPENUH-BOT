@@ -1,0 +1,18 @@
+*Contoh Pengisian Form Pendaftaran Umrah*
+
+[Pendaftaran Umrah - Contoh Data Diri]
+1. Nama Lengkap: Fulan Toyib
+2. Jenis Kelamin: Pria
+3. Tempat Lahir: Pontianak
+4. Tanggal Lahir: 24 September 2001
+5. Pekerjaan: Karyawan Swasta
+6. Alamat: Jl. Mengkudu
+7. Provinsi: Kalimantan Barat
+8. Kota: Pontianak
+9. Kecamatan: Siantan Tengah
+10. Nama Ayah: Fulan Yanto
+11. Nama Ibu: Fulanimah
+12. Nomor HP (WhatsApp): 089512345678 
+13. Nomor HP Keluarga (Boleh dikosongkan): 
+14. Email (Boleh dikosongkan): 
+15. Kode Paket Umrah: 1
