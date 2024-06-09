@@ -7,6 +7,7 @@ const BulkMessageController = require("../controllers/BulkMessageController");
 const fs = require("fs");
 const colors = require("colors");
 const cron = require("node-cron");
+const errorHandler = require("../utils/errorHandler");
 const appName = process.env.APP_NAME;
 const timeZone = process.env.TIME_ZONE;
 
@@ -99,7 +100,7 @@ class WhatsAppService {
           passport_photo: null,
           birth_certificate_photo: null,
         },
-        timestamp: moment(), // Add timestamp for the received message
+        timestamp: null,
       };
     }
 
@@ -113,15 +114,17 @@ class WhatsAppService {
 
   async clearOldUserStatuses() {
     const now = moment();
-    const urlApi = process.env.URL_API; // Atur URL API dari environment variable
-    const apiKey = process.env.CHATBOT_API_KEY; //  Atur API key dari environment variable
-    const time = 1;
+    const urlApi = process.env.URL_API;
+    const apiKey = process.env.CHATBOT_API_KEY;
+    const time = 1; // Atur seberapa lama registrasi yang gagal akan di hapus
 
     for (const userNumber of Object.keys(this.userStatus)) {
       const userData = this.userStatus[userNumber];
 
-      if (now.diff(userData.timestamp, "minutes") > time) {
-        // Store the registration number before deleting the user data
+      if (
+        now.diff(userData.timestamp, "minutes") > time &&
+        userData.registrationNumber
+      ) {
         const registrationNumber =
           this.userStatus[userNumber].registrationNumber;
 
@@ -129,7 +132,7 @@ class WhatsAppService {
 
         try {
           const response = await axiosDelete(
-            `${urlApi}/register/${registrationNumber}`,
+            `${urlApi}/register/bot/${registrationNumber}`,
             {
               headers: {
                 "Content-Type": "application/json",
@@ -143,7 +146,7 @@ class WhatsAppService {
               userNumber,
               `Halo,
 Pendaftaran Anda yang belum selesai telah dihapus oleh sistem karena tidak ada aktivitas selama lebih dari ${time} menit. 
-Jika Anda ingin melanjutkan pendaftaran, silakan mulai prosesnya dari awal.
+Jika Anda ingin melanjutkan pendaftaran, silakan ketik *!daftar-umrah* dan mulai prosesnya dari awal.
 
 Terima kasih.`
             );
@@ -155,9 +158,11 @@ Terima kasih.`
             console.log(JSON.stringify(this.userStatus, null, 2));
           }
         } catch (error) {
-          console.error(
-            `Failed to delete registration for ${userNumber}:`,
-            error.message
+          await errorHandler(
+            "clearOldUserStatuses",
+            error,
+            this.client,
+            this.userNumber
           );
         }
       }

@@ -3,6 +3,7 @@ const { extractPhotoTypeFromText } = require("../photoTypeExtractor");
 const { post } = require("axios");
 const { createReadStream } = require("fs");
 const { outroRegistrationResponse } = require("./outroRegistrationResponse");
+const errorHandler = require("../errorHandler");
 
 async function uploadPhoto(
   client,
@@ -31,6 +32,16 @@ async function uploadPhoto(
       config
     );
 
+    userStatus[userNumber].photoUrls["consumer_photo"] =
+      response.data.data.consumer_photo;
+    userStatus[userNumber].photoUrls["passport_photo"] =
+      response.data.data.passport_photo;
+    userStatus[userNumber].photoUrls["id_photo"] = response.data.data.id_photo;
+    userStatus[userNumber].photoUrls["birth_certificate_photo"] =
+      response.data.data.birth_certificate_photo;
+    userStatus[userNumber].photoUrls["family_card_photo"] =
+      response.data.data.family_card_photo;
+
     await sendPhotoUploadedMessage(
       client,
       userStatus,
@@ -39,21 +50,11 @@ async function uploadPhoto(
       urlApi,
       apiKey
     ); // Await the message sending function
+
     console.log(response.data);
     return response.data;
   } catch (error) {
-    if (error.response && error.response.data && error.response.data.errors) {
-      const errors = error.response.data.errors;
-      for (const key in errors) {
-        if (errors.hasOwnProperty(key)) {
-          const errorMessages = errors[key];
-          client.sendMessage(userNumber, errorMessages.join(", "));
-          console.log(`${errorMessages.join(", ")}`);
-        }
-      }
-    } else {
-      console.error("Unexpected error:", error);
-    }
+    await errorHandler("uploadPhoto", error, client, userNumber);
   }
 }
 
@@ -77,7 +78,6 @@ async function sendPhotoUploadedMessage(
           client,
           userStatus,
           userNumber,
-          photoType,
           urlApi,
           apiKey
         );
@@ -88,7 +88,7 @@ async function sendPhotoUploadedMessage(
       client.sendMessage(userNumber, message);
     }
   } catch (error) {
-    console.log("sendPhotoUploadedMessage function error: ", error);
+    await errorHandler("sendPhotoUploadedMessage", error, client, userNumber);
   }
 }
 
@@ -113,7 +113,7 @@ async function getNextPhotoType(userStatus, userNumber) {
     }
     return "selesai";
   } catch (error) {
-    console.log("getNextPhotoType Function Error: ", error);
+    await errorHandler("getNextPhotoType", error, client, userNumber);
   }
 }
 

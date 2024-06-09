@@ -14,6 +14,8 @@ const {
 const {
   outroRegistrationResponse,
 } = require("../utils/api/outroRegistrationResponse");
+const errorHandler = require("../utils/errorHandler");
+const { MessageMedia } = require("whatsapp-web.js");
 
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
@@ -58,6 +60,13 @@ class MessageController {
         message.from,
         "./messages/menu/main.txt"
       );
+
+      // let url =
+      //   "http://localhost:8000/storage/photos/Jamaah%20Umrah%20Januari/Tegar%20Ferdigantara/birth_certificate_photo_1717921287.jpg";
+      // const media = await MessageMedia.fromUrl(url);
+      // await this.client.sendMessage(this.userNumber, media, {
+      //   caption: "Test",
+      // });
     } catch {
       this.client.sendMessage(message.from, "error");
     }
@@ -201,6 +210,7 @@ class MessageController {
         response.data.data.umrah_package_id;
       this.userStatus[this.userNumber].registrationNumber =
         response.data.data.registration_number;
+      this.userStatus[this.userNumber].timestamp = moment();
 
       console.log(this.userStatus[this.userNumber]);
 
@@ -248,27 +258,44 @@ class MessageController {
         "./messages/registration/doc-number-outro.txt"
       );
     } catch (error) {
-      console.error(error);
-      if (error.response && error.response.data && error.response.data.errors) {
-        const errors = error.response.data.errors;
-        for (const key in errors) {
-          if (errors.hasOwnProperty(key)) {
-            const errorMessages = errors[key];
-            this.client.sendMessage(message.from, errorMessages.join(", "));
-            console.log(`${errorMessages.join(", ")}`);
-          }
-        }
-      } else {
-        this.client.sendMessage(
-          message.from,
-          "Terjadi kesalahan pada server. Silakan coba lagi nanti."
-        );
-      }
+      await errorHandler(
+        "handlePersonalData",
+        error,
+        this.client,
+        this.userNumber
+      );
     }
   }
 
   async handleDocumentData(message) {
     try {
+      if (
+        !this.userStatus[this.userNumber] ||
+        !this.userStatus[this.userNumber].registrationId
+      ) {
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/warn-personal.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/intro.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/personal-data-form-example.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/personal-data-form.txt"
+        );
+        return;
+      }
+
       const lines = message.body.split("\n");
       const dataInput = {};
       lines.forEach((line) => {
@@ -323,23 +350,54 @@ class MessageController {
         "./messages/registration/doc-file-form.txt"
       );
     } catch (error) {
-      console.error(error);
-      const errors = error.response.data.errors;
-
-      for (const key in errors) {
-        if (errors.hasOwnProperty(key)) {
-          const errorMessages = errors[key];
-          this.client.sendMessage(message.from, errorMessages.join(", "));
-          console.log(`${errorMessages.join(", ")}`);
-        }
-      }
+      await errorHandler(
+        "handleDocumentData",
+        error,
+        this.client,
+        this.userNumber
+      );
     }
   }
 
   async handleNoPhoto(message) {
+    if (
+      !this.userStatus[this.userNumber] ||
+      !this.userStatus[this.userNumber].documentId
+    ) {
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/warn-number.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-intro.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-form.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-outro.txt"
+      );
+      return;
+    }
+
     const [command, caption] = message.body.split(" ");
 
+    if (!caption) {
+      await this.client.sendMessage(
+        message.from,
+        "Harap sertakan jenis foto yang mau di skip. Contoh: *!skip-foto paspor*"
+      );
+      return;
+    }
     const photoType = extractPhotoTypeFromCaption(caption.toLowerCase());
+
     if (photoType in this.userStatus[this.userNumber].photoUploadStatus) {
       this.userStatus[this.userNumber].photoUploadStatus[photoType] = true;
 
@@ -367,11 +425,41 @@ class MessageController {
         this.client.sendMessage(message.from, skipMessage);
       }
     } else {
-      this.client.sendMessage(message.from, "Jenis foto tidak valid.");
+      this.client.sendMessage(
+        message.from,
+        "Jenis foto tidak valid harus berupa (PNG, JPEG)."
+      );
     }
   }
 
   async handleImageUpload(message) {
+    if (
+      !this.userStatus[this.userNumber] ||
+      !this.userStatus[this.userNumber].documentId
+    ) {
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/warn-number.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-intro.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-form.txt"
+      );
+      await sendFormatMessage(
+        this.client,
+        message.from,
+        "./messages/registration/doc-number-outro.txt"
+      );
+      return;
+    }
+
     const media = await message.downloadMedia();
     const caption = message.body.toLowerCase();
 
@@ -415,7 +503,7 @@ class MessageController {
 
     try {
       const response = await axiosDelete(
-        `${urlApi}/register/${registrationNumber}`,
+        `${urlApi}/register/user/${registrationNumber}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -427,19 +515,17 @@ class MessageController {
       if (response.data.data) {
         this.client.sendMessage(
           message.from,
-          `Pendaftaran dengan Nomor Registrasi ${registrationNumber} telah berhasil dibatalkan.`
+          `Pendaftaran Anda dengan Nomor Registrasi ${registrationNumber} telah berhasil dibatalkan.
+Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen dari database kami.`
         );
       }
     } catch (error) {
-      const errors = error.response.data.errors;
-
-      for (const key in errors) {
-        if (errors.hasOwnProperty(key)) {
-          const errorMessages = errors[key];
-          this.client.sendMessage(message.from, errorMessages.join(", "));
-          console.log(`${errorMessages.join(", ")}`);
-        }
-      }
+      await errorHandler(
+        "handleCancelRegistration",
+        error,
+        this.client,
+        this.userNumber
+      );
     }
   }
 
@@ -508,15 +594,13 @@ class MessageController {
 
       this.client.sendMessage(message.from, messageBody);
     } catch (error) {
-      const errors = error.response.data.errors;
-
-      for (const key in errors) {
-        if (errors.hasOwnProperty(key)) {
-          const errorMessages = errors[key];
-          this.client.sendMessage(message.from, errorMessages.join(", "));
-          console.log(`${errorMessages.join(", ")}`);
-        }
-      }
+      console.log(error);
+      await errorHandler(
+        "handleItineraryUmrahPackage",
+        error,
+        this.client,
+        message.from
+      );
     }
   }
 
@@ -532,8 +616,7 @@ class MessageController {
       });
       this.client.sendMessage(message.from, messageBody);
     } catch (error) {
-      console.error(error);
-      this.client.sendMessage(message.from, "FAQ Tidak tersedia.");
+      this.client.sendMessage(message.from, "FAQ tidak tersedia.");
     }
   }
 
@@ -544,8 +627,11 @@ class MessageController {
         message.from,
         "./messages/help-form.txt"
       );
-    } catch {
-      client.sendMessage(message.from, "error");
+    } catch (error) {
+      this.client.sendMessage(
+        message.from,
+        "Nomor Customer Service tidak tersedia."
+      );
     }
   }
 }
