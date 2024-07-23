@@ -5,7 +5,7 @@ const WhatsAppService = require("./services/WhatsAppService");
 const apiRoutes = require("./api");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3500;
 
 app.use(bodyParser.json());
 
