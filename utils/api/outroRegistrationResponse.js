@@ -96,7 +96,7 @@ async function umrahPackageInfo(client, userNumber, urlApi, apiKey, id) {
       style: "currency",
       currency: "IDR",
     }).format(response.data.price)}
-- Tanggal Keberangkatan: ${moment(response.data.depature_date)
+- Tanggal Keberangkatan: ${moment(response.data.departure_date)
       .locale("id")
       .format("DD MMMM YYYY")}
 - Durasi Perjalanan: ${response.data.duration} Hari`;

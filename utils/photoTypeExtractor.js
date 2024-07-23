@@ -5,7 +5,7 @@
  */
 function extractPhotoTypeFromCaption(caption) {
   const types = {
-    diri: "consumer_photo",
+    diri: "customer_photo",
     ktp: "id_photo",
     kk: "family_card_photo",
     paspor: "passport_photo",
@@ -28,7 +28,7 @@ function extractPhotoTypeFromCaption(caption) {
  */
 function extractPhotoTypeFromText(text) {
   const types = {
-    consumer_photo: "Foto Diri",
+    customer_photo: "Foto Diri",
     id_photo: "Foto KTP",
     family_card_photo: "Foto KK",
     passport_photo: "Foto Paspor",

@@ -10,7 +10,7 @@ class BulkMessageController {
   }
 
   async sendBulkMessage(req, res) {
-    const { messages } = req.body; // messages harus berupa array objek dengan { to: nomor, message: teks }
+    const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "Invalid messages format" });

@@ -32,8 +32,8 @@ async function uploadPhoto(
       config
     );
 
-    userStatus[userNumber].photoUrls["consumer_photo"] =
-      response.data.data.consumer_photo;
+    userStatus[userNumber].photoUrls["customer_photo"] =
+      response.data.data.customer_photo;
     userStatus[userNumber].photoUrls["passport_photo"] =
       response.data.data.passport_photo;
     userStatus[userNumber].photoUrls["id_photo"] = response.data.data.id_photo;

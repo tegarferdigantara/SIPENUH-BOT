@@ -17,14 +17,20 @@ class WhatsAppService {
       restartOnAuthFail: true,
       puppeteer: {
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--disable-gpu",
+          "--single-process",
+          "--no-zygote",
+        ],
       },
-      webVersionCache: {
-        type: "remote",
-        remotePath:
-          "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
-      },
-      authStrategy: new LocalAuth({ clientId: "client" }),
+      authStrategy: new LocalAuth({
+        clientId: this.id,
+        dataPath: this.sessionPath,
+      }),
     });
 
     this.userStatus = {};
@@ -87,14 +93,14 @@ class WhatsAppService {
         registrationId: null,
         documentId: null,
         photoUploadStatus: {
-          consumer_photo: false,
+          customer_photo: false,
           id_photo: false,
           family_card_photo: false,
           passport_photo: false,
           birth_certificate_photo: false,
         },
         photoUrls: {
-          consumer_photo: null,
+          customer_photo: null,
           id_photo: null,
           family_card_photo: null,
           passport_photo: null,
@@ -116,7 +122,7 @@ class WhatsAppService {
     const now = moment();
     const urlApi = process.env.URL_API;
     const apiKey = process.env.CHATBOT_API_KEY;
-    const time = 1; // Atur seberapa lama registrasi yang gagal akan di hapus
+    const time = 15; // Atur seberapa lama registrasi yang gagal akan di hapus
 
     for (const userNumber of Object.keys(this.userStatus)) {
       const userData = this.userStatus[userNumber];

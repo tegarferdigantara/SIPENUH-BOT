@@ -106,6 +106,7 @@ dist
 
 #Auth Sessions
 *.wwebjs_auth
+*.wwebjs_cache
 
 #js 
 example.js

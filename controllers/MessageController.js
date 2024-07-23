@@ -15,7 +15,6 @@ const {
   outroRegistrationResponse,
 } = require("../utils/api/outroRegistrationResponse");
 const errorHandler = require("../utils/errorHandler");
-const { MessageMedia } = require("whatsapp-web.js");
 
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
@@ -60,13 +59,6 @@ class MessageController {
         message.from,
         "./messages/menu/main.txt"
       );
-
-      // let url =
-      //   "http://localhost:8000/storage/photos/Jamaah%20Umrah%20Januari/Tegar%20Ferdigantara/birth_certificate_photo_1717921287.jpg";
-      // const media = await MessageMedia.fromUrl(url);
-      // await this.client.sendMessage(this.userNumber, media, {
-      //   caption: "Test",
-      // });
     } catch {
       this.client.sendMessage(message.from, "error");
     }
@@ -104,7 +96,7 @@ class MessageController {
           style: "currency",
           currency: "IDR",
         }).format(paket.price)}*\n`;
-        messageBody += `- Tanggal Berangkat: *${moment(paket.depature_date)
+        messageBody += `- Tanggal Berangkat: *${moment(paket.departure_date)
           .locale("id")
           .format("DD MMMM YYYY")}*\n`;
         messageBody += `- Kuota Tersisa: *${paket.quota}* \n`;
@@ -215,14 +207,16 @@ class MessageController {
       console.log(this.userStatus[this.userNumber]);
 
       const dataPendaftaranNomorDokumen = {
-        consumer_id: this.userStatus[this.userNumber].registrationId,
-        consumer_photo: null,
+        customer_id: this.userStatus[this.userNumber].registrationId,
+        customer_photo: null,
         passport_number: null,
         passport_photo: null,
         id_number: null,
         id_photo: null,
         birth_certificate_photo: null,
         family_card_photo: null,
+        id_number_verification: null,
+        passport_number_verification: null,
       };
 
       const responseNomorDokumen = await post(
@@ -316,14 +310,20 @@ class MessageController {
       }
 
       const dataPendaftaran = {
-        consumer_id: this.userStatus[this.userNumber].registrationId,
-        consumer_photo: null,
+        customer_id: this.userStatus[this.userNumber].registrationId,
+        customer_photo: null,
         passport_number: dataInput["1. nomor paspor"],
         passport_photo: null,
         id_number: dataInput["2. nomor ktp (nik)"],
         id_photo: null,
         birth_certificate_photo: null,
         family_card_photo: null,
+        id_number_verification: `${dataInput["2. nomor ktp (nik)"]}${parseInt(
+          this.userStatus[this.userNumber].umrahPackageNumber
+        )}`,
+        passport_number_verification: `${
+          dataInput["1. nomor paspor"]
+        }${parseInt(this.userStatus[this.userNumber].umrahPackageNumber)}`,
       };
 
       const response = await patch(
@@ -433,37 +433,40 @@ class MessageController {
   }
 
   async handleImageUpload(message) {
+    const media = await message.downloadMedia();
+    const caption = message.body.toLowerCase();
+    const photoType = extractPhotoTypeFromCaption(caption);
+
     if (
       !this.userStatus[this.userNumber] ||
       !this.userStatus[this.userNumber].documentId
     ) {
-      await sendFormatMessage(
-        this.client,
-        message.from,
-        "./messages/registration/warn-number.txt"
-      );
-      await sendFormatMessage(
-        this.client,
-        message.from,
-        "./messages/registration/doc-number-intro.txt"
-      );
-      await sendFormatMessage(
-        this.client,
-        message.from,
-        "./messages/registration/doc-number-form.txt"
-      );
-      await sendFormatMessage(
-        this.client,
-        message.from,
-        "./messages/registration/doc-number-outro.txt"
-      );
+      // Kirim pesan hanya jika ada caption
+      if (photoType !== null) {
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/warn-number.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-intro.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-form.txt"
+        );
+        await sendFormatMessage(
+          this.client,
+          message.from,
+          "./messages/registration/doc-number-outro.txt"
+        );
+      }
       return;
     }
 
-    const media = await message.downloadMedia();
-    const caption = message.body.toLowerCase();
-
-    const photoType = extractPhotoTypeFromCaption(caption);
     if (photoType !== null) {
       const fileName = `${message.from}-${photoType}.jpg`;
       const filePath = `media/photos/${fileName}`;
@@ -545,7 +548,7 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
         style: "currency",
         currency: "IDR",
       }).format(paket.price)}\n`;
-      messageBody += `- Tanggal Keberangkatan: ${moment(paket.depature_date)
+      messageBody += `- Tanggal Keberangkatan: ${moment(paket.departure_date)
         .locale("id")
         .format("DD MMMM YYYY")}\n`;
       messageBody += `- Fasilitas: ${paket.facility}\n`;
