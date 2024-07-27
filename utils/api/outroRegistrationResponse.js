@@ -59,7 +59,7 @@ Jika Anda ingin mengecek itinerary perjalanan Umrah, silakan ketik *!itinerary $
       console.log("TEST", photoUrls[photoType]);
       if (photoUrls.hasOwnProperty(photoType) && photoUrls[photoType]) {
         try {
-          let url = `http://localhost:8000/storage/${photoUrls[photoType]}`;
+          let url = `${urlApi}/storage/${photoUrls[photoType]}`;
           const media = await MessageMedia.fromUrl(url);
           await client.sendMessage(userNumber, media, {
             caption: extractPhotoTypeFromText(photoType),
