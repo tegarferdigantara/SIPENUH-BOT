@@ -1,5 +1,6 @@
 const { post, patch, delete: axiosDelete } = require("axios");
 const moment = require("moment");
+require("moment/locale/id");
 const { writeFile } = require("fs");
 const sendFormatMessage = require("../utils/sendFormatMessage");
 const axiosGet = require("../utils/api/axiosGet");
@@ -15,7 +16,8 @@ const {
   outroRegistrationResponse,
 } = require("../utils/api/outroRegistrationResponse");
 const errorHandler = require("../utils/errorHandler");
-
+const { chatbotLogger } = require("../utils/logger");
+const htmlTagConversion = require("../utils/htmlTagConversion");
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
 
@@ -28,30 +30,42 @@ class MessageController {
 
   async handleMessage(message) {
     if (message.body.toLowerCase() == "!start") {
+      chatbotLogger.info(`${message.from} action: Start`);
       await this.handleStart(message);
     } else if (message.body.toLowerCase() == "!daftar-umrah") {
+      chatbotLogger.info(`${message.from} action: Registration Start`);
       await this.handleRegistrationStart(message);
     } else if (message.body.toLowerCase().startsWith("!batal-umrah")) {
+      chatbotLogger.info(`${message.from} action: Cancel Registration`);
       await this.handleCancelRegistration(message);
     } else if (message.body.includes("[Pendaftaran Umrah - Data Diri]")) {
+      chatbotLogger.info(
+        `${message.from} action: Personal Data [START REGISTRATION SESSION]`
+      );
       await this.handlePersonalData(message);
     } else if (message.body.includes("[Pendaftaran Umrah - Nomor Dokumen]")) {
+      chatbotLogger.info(`${message.from} action: Document Data`);
       await this.handleDocumentData(message);
     } else if (message.body.toLowerCase().startsWith("!skip-foto")) {
+      chatbotLogger.info(`${message.from} action: Skip Photo`);
       await this.handleNoPhoto(message);
     } else if (message.type == "image") {
+      chatbotLogger.info(`${message.from} action: Upload Photo`);
       await this.handleImageUpload(message);
     } else if (message.body.toLowerCase() == "!paket-umrah") {
+      chatbotLogger.info(`${message.from} action: Umrah Package`);
       await this.handleUmrahPackage(message);
     } else if (message.body.toLowerCase().startsWith("!itinerary")) {
+      chatbotLogger.info(`${message.from} action: Itinerary`);
       await this.handleItineraryUmrahPackage(message);
     } else if (message.body.toLowerCase() == "!faq") {
+      chatbotLogger.info(`${message.from} action: FAQ`);
       await this.handleFaq(message);
     } else if (message.body.toLowerCase() == "!bantuan") {
+      chatbotLogger.info(`${message.from} action: Customer Service`);
       await this.handleCustomerService(message);
     }
   }
-
   async handleStart(message) {
     try {
       await sendFormatMessage(
@@ -60,7 +74,11 @@ class MessageController {
         "./messages/menu/main.txt"
       );
     } catch {
-      this.client.sendMessage(message.from, "error");
+      chatbotLogger.error(`Handle Start: Error ${error}`);
+      this.client.sendMessage(
+        message.from,
+        "Something went wrong. Please contact admin."
+      );
     }
   }
 
@@ -82,8 +100,16 @@ class MessageController {
         "./messages/registration/personal-data-form.txt"
       );
 
-      const datas = await axiosGet(`${urlApi}/umrah-packages`, apiKey);
+      const datas = await axiosGet(`${urlApi}/api/umrah-packages`, apiKey);
       const packages = datas.data;
+
+      if (packages.length === 0) {
+        this.client.sendMessage(
+          message.from,
+          "Paket Umrah tidak tersedia saat ini."
+        );
+        return;
+      }
 
       let messageBody = `🕋 List Paket Umrah Tersedia: \n\n`;
 
@@ -99,12 +125,16 @@ class MessageController {
         messageBody += `- Tanggal Berangkat: *${moment(paket.departure_date)
           .locale("id")
           .format("DD MMMM YYYY")}*\n`;
-        messageBody += `- Kuota Tersisa: *${paket.quota}* \n`;
+        messageBody += `- Kuota Tersisa: *${paket.quota}* \n\n`;
       });
 
       this.client.sendMessage(message.from, messageBody);
     } catch {
-      this.client.sendMessage(message.from, "error");
+      chatbotLogger.error(`Handle Registration Start: Error ${error}`);
+      this.client.sendMessage(
+        message.from,
+        "Something went wrong. Please contact admin."
+      );
     }
   }
 
@@ -174,9 +204,9 @@ class MessageController {
         umrah_package_id: parseInt(dataInput["15. kode paket umrah"]),
       };
 
-      console.log(dataPendaftaran);
+      //   console.log("Data Pendaftaran Client Output: ", dataPendaftaran);
 
-      const response = await post(`${urlApi}/register`, dataPendaftaran, {
+      const response = await post(`${urlApi}/api/register`, dataPendaftaran, {
         headers: {
           Authorization: apiKey,
         },
@@ -204,7 +234,10 @@ class MessageController {
         response.data.data.registration_number;
       this.userStatus[this.userNumber].timestamp = moment();
 
-      console.log(this.userStatus[this.userNumber]);
+      console.log(
+        "Data Pendaftaran Server Output: ",
+        this.userStatus[this.userNumber]
+      );
 
       const dataPendaftaranNomorDokumen = {
         customer_id: this.userStatus[this.userNumber].registrationId,
@@ -220,7 +253,7 @@ class MessageController {
       };
 
       const responseNomorDokumen = await post(
-        `${urlApi}/register/document`,
+        `${urlApi}/api/register/document`,
         dataPendaftaranNomorDokumen,
         {
           headers: {
@@ -229,12 +262,15 @@ class MessageController {
         }
       );
 
-      console.log(responseNomorDokumen.data.data);
+      console.log("Dokumen Data: ", responseNomorDokumen.data.data);
 
       this.userStatus[this.userNumber].documentId =
         responseNomorDokumen.data.data.id;
 
-      console.log(this.userStatus);
+      console.log(
+        `Data Temporary Keseluruhan ${this.userNumber}:`,
+        this.userStatus[this.userNumber]
+      );
 
       await sendFormatMessage(
         this.client,
@@ -327,7 +363,7 @@ class MessageController {
       };
 
       const response = await patch(
-        `${urlApi}/register/document/${
+        `${urlApi}/api/register/document/${
           this.userStatus[this.userNumber].documentId
         }`,
         dataPendaftaran,
@@ -342,7 +378,10 @@ class MessageController {
         response.data.data.passport_number;
       this.userStatus[this.userNumber].idNumber = response.data.data.id_number;
 
-      console.log(this.userStatus[this.userNumber]);
+      console.log(
+        "Data Dokumen Server Output:",
+        this.userStatus[this.userNumber]
+      );
 
       await sendFormatMessage(
         this.client,
@@ -360,6 +399,7 @@ class MessageController {
   }
 
   async handleNoPhoto(message) {
+    // Periksa apakah pengguna sudah memiliki pendaftaran yang sedang berlangsung
     if (
       !this.userStatus[this.userNumber] ||
       !this.userStatus[this.userNumber].documentId
@@ -389,6 +429,7 @@ class MessageController {
 
     const [command, caption] = message.body.split(" ");
 
+    // Handle jika pesan !skip-foto tidak memiliki caption
     if (!caption) {
       await this.client.sendMessage(
         message.from,
@@ -396,6 +437,7 @@ class MessageController {
       );
       return;
     }
+
     const photoType = extractPhotoTypeFromCaption(caption.toLowerCase());
 
     if (photoType in this.userStatus[this.userNumber].photoUploadStatus) {
@@ -472,7 +514,7 @@ class MessageController {
       const filePath = `media/photos/${fileName}`;
       writeFile(filePath, media.data, "base64", (err) => {
         if (err) {
-          console.error("Gagal menyimpan foto:", err);
+          chatbotLogger.error(`Gagal menyimpan foto: ${err}`);
         } else {
           uploadPhoto(
             this.client,
@@ -487,7 +529,7 @@ class MessageController {
         }
       });
     } else {
-      console.log(
+      chatbotLogger.info(
         `${message.from}: Keterangan tidak mencantumkan jenis foto yang dikirim.`
       );
     }
@@ -506,7 +548,7 @@ class MessageController {
 
     try {
       const response = await axiosDelete(
-        `${urlApi}/register/user/${registrationNumber}`,
+        `${urlApi}/api/register/user/${registrationNumber}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -533,38 +575,46 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
   }
 
   async handleUmrahPackage(message) {
-    const datas = await axiosGet(`${urlApi}/umrah-packages`, apiKey);
-    const packages = datas.data;
+    try {
+      const datas = await axiosGet(`${urlApi}/api/umrah-packages`, apiKey);
+      const packages = datas.data;
 
-    let messageBody = `🕋 Selamat Datang di Layanan Paket Umrah Kami! 🕋\n\nMari Memilih Paket Umrah yang Cocok untuk Anda:\n\n`;
+      let messageBody = `🕋 Selamat Datang di Layanan Paket Umrah Kami! 🕋\n\nMari Memilih Paket Umrah yang Cocok untuk Anda:\n\n`;
 
-    packages.forEach((paket, index) => {
-      messageBody += `${index + 1}. Paket ${paket.name} (Kode Paket: ${
-        paket.id
-      })\n`;
-      messageBody += `- Deskripsi: ${paket.description}\n`;
-      messageBody += `- Durasi: ${paket.duration} hari\n`;
-      messageBody += `- Harga: ${new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-      }).format(paket.price)}\n`;
-      messageBody += `- Tanggal Keberangkatan: ${moment(paket.departure_date)
-        .locale("id")
-        .format("DD MMMM YYYY")}\n`;
-      messageBody += `- Fasilitas: ${paket.facility}\n`;
-      messageBody += `- Tujuan: ${paket.destination}\n`;
-      messageBody += `- Kuota: ${paket.quota}\n`;
-    });
+      packages.forEach((paket, index) => {
+        messageBody += `${index + 1}. ${paket.name} (Kode Paket: ${
+          paket.id
+        })\n`;
+        messageBody += `- Deskripsi: ${paket.description}\n`;
+        messageBody += `- Durasi: ${paket.duration} hari\n`;
+        messageBody += `- Harga: ${new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+        }).format(paket.price)}\n`;
+        messageBody += `- Tanggal Keberangkatan: ${moment(
+          paket.departure_date
+        ).format("dddd, DD MMMM YYYY")}\n`;
+        messageBody += `- Fasilitas: ${htmlTagConversion(paket.facility)}\n`;
+        messageBody += `- Tujuan: ${paket.destination}\n`;
+        messageBody += `- Kuota: ${paket.quota}\n\n`;
+      });
 
-    messageBody += `Untuk melakukan pemesanan anda dapat dengan mudah mengetik *!daftar-umrah*.\n\n`;
-    messageBody += `Informasi lebih lanjut hubungi `;
+      messageBody += `Untuk melakukan pemesanan anda dapat dengan mudah mengetik *!daftar-umrah*.\n\n`;
+      messageBody += `Informasi lebih lanjut hubungi `;
 
-    this.client.sendMessage(message.from, messageBody);
+      this.client.sendMessage(message.from, messageBody);
+    } catch (error) {
+      await errorHandler(
+        "handleUmrahPackage",
+        error,
+        this.client,
+        message.from
+      );
+    }
   }
 
   async handleItineraryUmrahPackage(message) {
     const umrahPackageNumber = message.body.split(" ")[1];
-    console.log(umrahPackageNumber);
 
     if (!umrahPackageNumber) {
       this.client.sendMessage(
@@ -576,12 +626,12 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
 
     try {
       const datas = await axiosGet(
-        `${urlApi}/itineraries/${umrahPackageNumber}`,
+        `${urlApi}/api/itineraries/${umrahPackageNumber}`,
         apiKey
       );
       const itineraries = datas.data;
 
-      if (itineraries.length === 0) {
+      if (!itineraries || itineraries.length === 0) {
         this.client.sendMessage(
           message.from,
           "Itinerary belum tersedia untuk paket ini."
@@ -589,15 +639,19 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
         return;
       }
 
-      let messageBody = `*Itinerary untuk Paket Umrah Nomor ${umrahPackageNumber}*\n\n`;
+      const umrahPackageName = itineraries[0].umrah_package_name;
+      let messageBody = `*Jadwal Perjalanan/Itinerary untuk Paket ${umrahPackageName} [Kode Paket: ${umrahPackageNumber}]*\n\n`;
+
       itineraries.forEach((itinerary) => {
-        messageBody += `Tanggal: *${itinerary.date}*\n`;
-        messageBody += `Kegiatan: ${itinerary.activity}\n\n`;
+        messageBody += `Tanggal: *${moment(itinerary.date).format("LLLL")}*\n`;
+        messageBody += `Kegiatan: ${itinerary.title}\n`;
+        messageBody += `Aktivitas: ${htmlTagConversion(
+          itinerary.activity
+        )}\n\n`;
       });
 
       this.client.sendMessage(message.from, messageBody);
     } catch (error) {
-      console.log(error);
       await errorHandler(
         "handleItineraryUmrahPackage",
         error,
@@ -609,16 +663,17 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
 
   async handleFaq(message) {
     try {
-      const datas = await axiosGet(`${urlApi}/faq`, apiKey);
+      const datas = await axiosGet(`${urlApi}/api/faq`, apiKey);
       const faqs = datas.data;
 
       let messageBody = `*Frequently Asked Questions (FAQ)*\n\n`;
       faqs.forEach((faq, index) => {
         messageBody += `${index + 1}. *${faq.question}*\n`;
-        messageBody += `- Jawaban: ${faq.answer}\n`;
+        messageBody += `- Jawaban: ${htmlTagConversion(faq.answer)}\n\n`;
       });
       this.client.sendMessage(message.from, messageBody);
     } catch (error) {
+      chatbotLogger.error(`FAQ tidak tersedia. ${error}`);
       this.client.sendMessage(message.from, "FAQ tidak tersedia.");
     }
   }
@@ -631,6 +686,7 @@ Seluruh data pribadi Anda terkait pendaftaran ini telah dihapus secara permanen 
         "./messages/help-form.txt"
       );
     } catch (error) {
+      chatbotLogger.error(`Handle Customer Service: Error ${error}`);
       this.client.sendMessage(
         message.from,
         "Nomor Customer Service tidak tersedia."

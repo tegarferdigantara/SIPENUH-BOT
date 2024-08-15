@@ -1,8 +1,10 @@
 const moment = require("moment-timezone");
+require("moment/locale/id");
 const axiosGet = require("../api/axiosGet");
-const { Location, MessageMedia } = require("whatsapp-web.js");
+const { MessageMedia } = require("whatsapp-web.js");
 const errorHandler = require("../errorHandler");
 const { extractPhotoTypeFromText } = require("../photoTypeExtractor");
+const { chatbotLogger } = require("../logger");
 
 async function outroRegistrationResponse(
   client,
@@ -12,13 +14,6 @@ async function outroRegistrationResponse(
   apiKey
 ) {
   try {
-    const selectedUmrahPackageMessage = await umrahPackageInfo(
-      client,
-      userNumber,
-      urlApi,
-      apiKey,
-      userStatus[userNumber].umrahPackageNumber
-    );
     const personalDataMessage = `🤖👋 Terima kasih telah mengisi formulir pendaftaran Umrah Anda! 🕋
 
 Berikut adalah informasi yang Anda berikan:
@@ -38,6 +33,14 @@ Berikut adalah informasi yang Anda berikan:
 7. *Nomor KTP (NIK):* ${userStatus[userNumber].idNumber}
   `;
 
+    const selectedUmrahPackageMessage = await umrahPackageInfo(
+      client,
+      userNumber,
+      urlApi,
+      apiKey,
+      userStatus[userNumber].umrahPackageNumber
+    );
+
     const customerServiceMessage = `
 ✅ Data pendaftaran Anda telah kami terima dengan *Nomor Registrasi: ${userStatus[userNumber].registrationNumber}*. 
 Kami akan segera memproses pendaftaran Anda dan menghubungi Anda untuk langkah selanjutnya.
@@ -54,32 +57,27 @@ Jika Anda ingin mengecek itinerary perjalanan Umrah, silakan ketik *!itinerary $
     await client.sendMessage(userNumber, selectedUmrahPackageMessage);
     await client.sendMessage(userNumber, customerServiceMessage);
 
+    // Kirim foto yang telah diunggah oleh user (Outro)
     const photoUrls = userStatus[userNumber].photoUrls;
     for (const photoType in photoUrls) {
-      console.log("TEST", photoUrls[photoType]);
       if (photoUrls.hasOwnProperty(photoType) && photoUrls[photoType]) {
         try {
           let url = `${urlApi}/storage/${photoUrls[photoType]}`;
           const media = await MessageMedia.fromUrl(url);
+          //Kirim media beserta caption
           await client.sendMessage(userNumber, media, {
             caption: extractPhotoTypeFromText(photoType),
           });
+          chatbotLogger.info(
+            `Sent media from URL ${photoUrls[photoType]} to ${userNumber}`
+          );
         } catch (error) {
-          console.error(
-            `Failed to send media from URL ${photoUrls[photoType]}:`,
-            error
+          chatbotLogger.error(
+            `Failed to send media from URL ${photoUrls[photoType]}: ${error}`
           );
         }
       }
     }
-
-    // Mengirim lokasi dengan menggunakan format yang benar
-    const location = new Location(-0.013546, 109.320332, {
-      name: "PT. Arhas Bugis Tours & Travel Kota Pontianak",
-      address:
-        "Jl. Apel, Sungai Jawi Luar, Kec. Pontianak Bar., Kota Pontianak, Kalimantan Barat 78244",
-    });
-    await client.sendMessage(userNumber, location);
   } catch (error) {
     await errorHandler("outroRegistrationResponse", error, client, userNumber);
   }
@@ -87,7 +85,10 @@ Jika Anda ingin mengecek itinerary perjalanan Umrah, silakan ketik *!itinerary $
 
 async function umrahPackageInfo(client, userNumber, urlApi, apiKey, id) {
   try {
-    const response = await axiosGet(`${urlApi}/umrah-packages/${id}`, apiKey);
+    const response = await axiosGet(
+      `${urlApi}/api/umrah-packages/${id}`,
+      apiKey
+    );
 
     const message = `Paket Umrah Yang Anda Pilih:
 ----------------------------
@@ -96,9 +97,9 @@ async function umrahPackageInfo(client, userNumber, urlApi, apiKey, id) {
       style: "currency",
       currency: "IDR",
     }).format(response.data.price)}
-- Tanggal Keberangkatan: ${moment(response.data.departure_date)
-      .locale("id")
-      .format("DD MMMM YYYY")}
+- Tanggal Keberangkatan: ${moment(response.data.departure_date).format(
+      "dddd, DD MMMM YYYY"
+    )}
 - Durasi Perjalanan: ${response.data.duration} Hari`;
 
     return message;

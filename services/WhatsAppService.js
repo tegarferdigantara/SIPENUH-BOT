@@ -1,16 +1,16 @@
-const { Client, LocalAuth, Location } = require("whatsapp-web.js");
+const { Client, LocalAuth } = require("whatsapp-web.js");
 const { delete: axiosDelete } = require("axios");
 const qrcode = require("qrcode-terminal");
 const moment = require("moment-timezone");
+require("moment/locale/id");
 const MessageController = require("../controllers/MessageController");
 const BulkMessageController = require("../controllers/BulkMessageController");
 const fs = require("fs");
 const colors = require("colors");
 const cron = require("node-cron");
 const errorHandler = require("../utils/errorHandler");
-const appName = process.env.APP_NAME;
-const timeZone = process.env.TIME_ZONE;
-
+const { chatbotLogger, webhookLogger } = require("../utils/logger");
+const { setBotStatus } = require("../utils/botStatus");
 class WhatsAppService {
   constructor() {
     this.client = new Client({
@@ -41,6 +41,7 @@ class WhatsAppService {
     this.client.on("qr", this.onQrReceived.bind(this));
     this.client.on("ready", this.onReady.bind(this));
     this.client.on("message", this.onMessageReceived.bind(this));
+    this.client.on("disconnected", this.onDisconnected.bind(this));
 
     // Setup cron job to clear old user statuses
     cron.schedule("* * * * *", this.clearOldUserStatuses.bind(this));
@@ -56,20 +57,27 @@ class WhatsAppService {
   }
 
   onReady() {
+    setBotStatus(true);
     console.clear();
     const consoleText = "./config/console.txt";
 
     fs.readFile(consoleText, "utf-8", (err, data) => {
-      const timestamp = `[${moment().tz(timeZone).format("HH:mm:ss")}]`;
-
       if (err) {
-        console.log(`${timestamp} Console Text not found!`.red);
+        chatbotLogger.error("Console Text not found!");
       } else {
         console.log(data.yellow);
       }
-
-      console.log(`${timestamp} ${appName} is Running!`.white);
+      chatbotLogger.info(
+        `Running on phone number: ${this.client.info.wid.user || null} `
+      );
+      webhookLogger.info(`Running on port ${process.env.WEBHOOK_PORT}`);
     });
+  }
+
+  onDisconnected(reason) {
+    setBotStatus(false);
+    chatbotLogger.error(`disconnected: ${reason}`);
+    webhookLogger.error(`disconnected: ${reason}`);
   }
 
   async onMessageReceived(message) {
@@ -122,7 +130,7 @@ class WhatsAppService {
     const now = moment();
     const urlApi = process.env.URL_API;
     const apiKey = process.env.CHATBOT_API_KEY;
-    const time = 15; // Atur seberapa lama registrasi yang gagal akan di hapus
+    const time = process.env.TIME_SESSION_RESET || 30;
 
     for (const userNumber of Object.keys(this.userStatus)) {
       const userData = this.userStatus[userNumber];
@@ -156,12 +164,18 @@ Jika Anda ingin melanjutkan pendaftaran, silakan ketik *!daftar-umrah* dan mulai
 
 Terima kasih.`
             );
-
-            console.log(
-              `User data for ${userNumber} has been cleared due to inactivity.`
+            //check data sementara (devmode)
+            chatbotLogger.info(
+              `Current user status data: ${JSON.stringify(
+                this.userStatus,
+                null,
+                2
+              )}`
             );
-            console.log("Current user status data:");
-            console.log(JSON.stringify(this.userStatus, null, 2));
+
+            chatbotLogger.info(
+              `User data for ${userNumber} has been cleared due to inactivity. [END REGISTRATION SESSION]`
+            );
           }
         } catch (error) {
           await errorHandler(

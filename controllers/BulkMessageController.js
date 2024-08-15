@@ -1,8 +1,8 @@
-const axios = require("axios");
+const { webhookLogger } = require("../utils/logger");
 
 class BulkMessageController {
   constructor() {
-    this.client = null; // Client WhatsApp akan diset di luar controller ini
+    this.client = null;
   }
 
   setClient(client) {
@@ -11,26 +11,46 @@ class BulkMessageController {
 
   async sendBulkMessage(req, res) {
     const { messages } = req.body;
-
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "Invalid messages format" });
     }
 
+    res.status(200).json({
+      success: true,
+      message: `${messages.length} pesan berhasil di antrikan untuk dikirim.`,
+    });
+
+    // Proses pengiriman pesan setelah response dikirim
+    this.processBulkMessages(messages, req);
+  }
+
+  async processBulkMessages(messages, req) {
+    for (const msg of messages) {
+      await this.sendMessageWithDelay(msg, req);
+    }
+  }
+
+  async sendMessageWithDelay(msg, req) {
+    const delayTime = msg.delay ?? 15;
+    const delay = delayTime * 1000; // Konversi detik ke milidetik
+
     try {
-      const sendMessagesPromises = messages.map(async (msg) => {
-        await this.client.sendMessage(msg.to, msg.message);
-      });
+      // Kirim pesan
+      await this.client.sendMessage(msg.to, msg.message);
+      webhookLogger.info(
+        `Message sent to ${msg.to} [Request IP: ${[
+          req.headers["x-forwarded-for"] || req.connection.remoteAddress,
+        ]}]`
+      );
 
-      await Promise.all(sendMessagesPromises);
-
-      res
-        .status(200)
-        .json({ success: true, message: "Messages sent successfully" });
+      // Tunggu sesuai delay yang ditentukan
+      await new Promise((resolve) => setTimeout(resolve, delay));
     } catch (error) {
-      console.error("Error sending bulk messages:", error);
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to send messages" });
+      webhookLogger.error(
+        `Failed to send message to ${msg.to}: ${error.message} [Request IP: ${[
+          req.headers["x-forwarded-for"] || req.connection.remoteAddress,
+        ]}]`
+      );
     }
   }
 }

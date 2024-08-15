@@ -4,6 +4,7 @@ const { post } = require("axios");
 const { createReadStream } = require("fs");
 const { outroRegistrationResponse } = require("./outroRegistrationResponse");
 const errorHandler = require("../errorHandler");
+const { chatbotLogger } = require("../logger");
 
 async function uploadPhoto(
   client,
@@ -27,7 +28,7 @@ async function uploadPhoto(
     };
 
     const response = await post(
-      `${urlApi}/register/document/${userStatus[userNumber].documentId}`,
+      `${urlApi}/api/register/document/${userStatus[userNumber].documentId}`,
       formData,
       config
     );
@@ -51,7 +52,7 @@ async function uploadPhoto(
       apiKey
     ); // Await the message sending function
 
-    console.log(response.data);
+    console.log("Photo uploaded successfully: ", response.data);
     return response.data;
   } catch (error) {
     await errorHandler("uploadPhoto", error, client, userNumber);

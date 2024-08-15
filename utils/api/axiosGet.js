@@ -1,4 +1,5 @@
 const { get } = require("axios");
+const { chatbotLogger } = require("../logger");
 
 async function axiosGet(url, apiKey) {
   try {
@@ -9,8 +10,14 @@ async function axiosGet(url, apiKey) {
     });
     return response.data;
   } catch (error) {
-    console.error("axiosGet error fetching data:", error);
-    throw error;
+    if (error.response.status === 401) {
+      chatbotLogger.error(
+        "axiosGet error. Unauthorized access (Invalid API Key)",
+        error.response.data
+      );
+    } else {
+      chatbotLogger.error("axiosGet error fetching data:", error.response.data);
+    }
   }
 }
 
