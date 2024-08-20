@@ -18,8 +18,12 @@ const {
 const errorHandler = require("../utils/errorHandler");
 const { chatbotLogger } = require("../utils/logger");
 const htmlTagConversion = require("../utils/htmlTagConversion");
+const NodeCache = require("node-cache");
 const urlApi = process.env.URL_API;
 const apiKey = process.env.CHATBOT_API_KEY;
+const timeSession = process.env.TIME_SESSION_RESET * 60;
+
+const sessionCache = new NodeCache({ stdTTL: timeSession, checkperiod: 120 });
 
 class MessageController {
   constructor(client, userNumber, userStatus) {
@@ -29,43 +33,109 @@ class MessageController {
   }
 
   async handleMessage(message) {
-    if (message.body.toLowerCase() == "!start") {
-      chatbotLogger.info(`${message.from} action: Start`);
-      await this.handleStart(message);
-    } else if (message.body.toLowerCase() == "!daftar-umrah") {
-      chatbotLogger.info(`${message.from} action: Registration Start`);
-      await this.handleRegistrationStart(message);
-    } else if (message.body.toLowerCase().startsWith("!batal-umrah")) {
-      chatbotLogger.info(`${message.from} action: Cancel Registration`);
-      await this.handleCancelRegistration(message);
-    } else if (message.body.includes("[Pendaftaran Umrah - Data Diri]")) {
-      chatbotLogger.info(
-        `${message.from} action: Personal Data [START REGISTRATION SESSION]`
+    try {
+      const isExistingSession = sessionCache.has(message.from);
+
+      if (!isExistingSession) {
+        console.log(
+          `No session found for ${message.from}. Creating new session.`
+        );
+        chatbotLogger.info(
+          `${message.from} action: Start [NEW WHATSAPP NUMBER]`
+        );
+        await this.handleStart(message);
+        sessionCache.set(message.from, { startTime: Date.now() });
+        this.logSessions();
+      } else {
+        chatbotLogger.info(`Existing session found for ${message.from}`);
+        const lowerCaseBody = message.body.toLowerCase();
+
+        switch (true) {
+          case lowerCaseBody === "!start":
+            chatbotLogger.info(`${message.from} action: Start`);
+            await this.handleStart(message);
+            break;
+          case lowerCaseBody === "!daftar-umrah":
+            chatbotLogger.info(`${message.from} action: Registration Start`);
+            await this.handleRegistrationStart(message);
+            break;
+          case lowerCaseBody.startsWith("!batal-umrah"):
+            chatbotLogger.info(`${message.from} action: Cancel Registration`);
+            await this.handleCancelRegistration(message);
+            break;
+          case message.body.includes("[Pendaftaran Umrah - Data Diri]"):
+            chatbotLogger.info(
+              `${message.from} action: Personal Data [START REGISTRATION SESSION]`
+            );
+            await this.handlePersonalData(message);
+            break;
+          case message.body.includes("[Pendaftaran Umrah - Nomor Dokumen]"):
+            chatbotLogger.info(`${message.from} action: Document Data`);
+            await this.handleDocumentData(message);
+            break;
+          case lowerCaseBody.startsWith("!skip-foto"):
+            chatbotLogger.info(`${message.from} action: Skip Photo`);
+            await this.handleNoPhoto(message);
+            break;
+          case message.type === "image":
+            chatbotLogger.info(`${message.from} action: Upload Photo`);
+            await this.handleImageUpload(message);
+            break;
+          case lowerCaseBody === "!paket-umrah":
+            chatbotLogger.info(`${message.from} action: Umrah Package`);
+            await this.handleUmrahPackage(message);
+            break;
+          case lowerCaseBody.startsWith("!itinerary"):
+            chatbotLogger.info(`${message.from} action: Itinerary`);
+            await this.handleItineraryUmrahPackage(message);
+            break;
+          case lowerCaseBody === "!faq":
+            chatbotLogger.info(`${message.from} action: FAQ`);
+            await this.handleFaq(message);
+            break;
+          case lowerCaseBody === "!bantuan":
+            chatbotLogger.info(`${message.from} action: Customer Service`);
+            await this.handleCustomerService(message);
+            break;
+          default:
+            chatbotLogger.info(`${message.from} action: Unknown Command`);
+            await this.handleUnknownCommand(message);
+            break;
+        }
+      }
+
+      if (isExistingSession) {
+        sessionCache.ttl(message.from, timeSession); // Reset TTL to 30 minutes
+      }
+    } catch (error) {
+      console.error(`Error handling message from ${message.from}:`, error);
+      chatbotLogger.error(
+        `Error handling message from ${message.from}: ${error.message}`
       );
-      await this.handlePersonalData(message);
-    } else if (message.body.includes("[Pendaftaran Umrah - Nomor Dokumen]")) {
-      chatbotLogger.info(`${message.from} action: Document Data`);
-      await this.handleDocumentData(message);
-    } else if (message.body.toLowerCase().startsWith("!skip-foto")) {
-      chatbotLogger.info(`${message.from} action: Skip Photo`);
-      await this.handleNoPhoto(message);
-    } else if (message.type == "image") {
-      chatbotLogger.info(`${message.from} action: Upload Photo`);
-      await this.handleImageUpload(message);
-    } else if (message.body.toLowerCase() == "!paket-umrah") {
-      chatbotLogger.info(`${message.from} action: Umrah Package`);
-      await this.handleUmrahPackage(message);
-    } else if (message.body.toLowerCase().startsWith("!itinerary")) {
-      chatbotLogger.info(`${message.from} action: Itinerary`);
-      await this.handleItineraryUmrahPackage(message);
-    } else if (message.body.toLowerCase() == "!faq") {
-      chatbotLogger.info(`${message.from} action: FAQ`);
-      await this.handleFaq(message);
-    } else if (message.body.toLowerCase() == "!bantuan") {
-      chatbotLogger.info(`${message.from} action: Customer Service`);
-      await this.handleCustomerService(message);
     }
   }
+
+  logSessions() {
+    const keys = sessionCache.keys();
+    keys.forEach((sender) => {
+      const session = sessionCache.get(sender);
+      if (session) {
+        const remainingTime = Math.ceil(
+          (sessionCache.getTtl(sender) - Date.now()) / 1000
+        );
+        chatbotLogger.info(
+          `Sender: ${sender}, Remaining Time: ${remainingTime} seconds`
+        );
+      }
+    });
+  }
+
+  async handleUnknownCommand(message) {
+    await message.reply(
+      "Maaf, perintah tidak dikenali. Silakan ketik *!start* untuk melihat daftar perintah yang tersedia."
+    );
+  }
+
   async handleStart(message) {
     try {
       await sendFormatMessage(
@@ -77,7 +147,7 @@ class MessageController {
       chatbotLogger.error(`Handle Start: Error ${error}`);
       this.client.sendMessage(
         message.from,
-        "Something went wrong. Please contact admin."
+        "Something went wrong. Please contact administrator."
       );
     }
   }
@@ -133,7 +203,7 @@ class MessageController {
       chatbotLogger.error(`Handle Registration Start: Error ${error}`);
       this.client.sendMessage(
         message.from,
-        "Something went wrong. Please contact admin."
+        "Something went wrong. Please contact administrator."
       );
     }
   }
@@ -525,6 +595,7 @@ class MessageController {
             apiKey,
             photoType
           );
+          //set status photo upload => true in whatsappservice.js
           this.userStatus[message.from].photoUploadStatus[photoType] = true;
         }
       });

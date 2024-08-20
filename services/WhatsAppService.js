@@ -146,7 +146,7 @@ class WhatsAppService {
 
         try {
           const response = await axiosDelete(
-            `${urlApi}/register/bot/${registrationNumber}`,
+            `${urlApi}/api/register/bot/${registrationNumber}`,
             {
               headers: {
                 "Content-Type": "application/json",

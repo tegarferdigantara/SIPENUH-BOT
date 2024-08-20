@@ -1,26 +1,25 @@
-Assalamualaikum Warahmatullahi Wabarakatuh
-🤖👋 Selamat datang di Layanan Pendaftaran Umrah PT. Arhas Bugis Tours & Travel Cabang Pontianak!🕋
+Selamat datang di Layanan Pendaftaran Umrah Assyubban Tour! 🕋
 
-Alhamdulillah, PT. Arhas Bugis Tours & Travel Cabang Pontianak siap membantu Anda mewujudkan impian untuk menunaikan ibadah Umrah. 
-Kami menawarkan berbagai paket Umrah dengan harga terjangkau dan pelayanan terbaik.
+Alhamdulillah, Assyubban Tour siap membantu Anda mewujudkan impian untuk menunaikan ibadah Umrah. Kami menawarkan berbagai paket Umrah dengan harga terjangkau dan pelayanan terbaik.
 
 Silakan pilih opsi di bawah ini:
 
 📋 Menu:
-1. Pendaftaran Umrah 
-- [Ketik: *!daftar-umrah*]
 
-1. Pembatalan Pendaftaran Umrah 
-- [Ketik: *!batal-umrah* (spasi) (nomor_registrasi_pendaftaran)]
+Pendaftaran Umrah
+- [Ketik: _!daftar-umrah_]
 
-2. Informasi Paket Umrah 
-- [Ketik: *!paket-umrah*]
+Pembatalan Pendaftaran Umrah
+- [Ketik: _!batal-umrah (spasi) (nomor_registrasi)_]
 
-3. Informasi Perjalanan Paket Umrah 
-- [Ketik: *!itinerary* (spasi) (nomor_paket_umrah)]
+Informasi Paket Umrah
+- [Ketik: _!paket-umrah_]
 
-4. Pertanyaan Yang Sering Diajukan (FAQ) 
-- [Ketik: *!faq*]
-    
-5. Bantuan 
-- [Ketik: *!bantuan*]
+Informasi Perjalanan Paket Umrah
+- [Ketik: _!itinerary (spasi) (nomor_paket)_]
+
+Pertanyaan Yang Sering Diajukan (FAQ)
+- [Ketik: _!faq_]
+
+Bantuan
+- [Ketik: _!bantuan_]

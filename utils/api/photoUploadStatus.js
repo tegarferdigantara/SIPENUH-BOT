@@ -82,6 +82,9 @@ async function sendPhotoUploadedMessage(
           urlApi,
           apiKey
         );
+        chatbotLogger.info(
+          `User ${userNumber} has completed the registration process. [END REGISTRATION SESSION]`
+        );
         delete userStatus[userNumber];
       }
     } else {
@@ -95,12 +98,12 @@ async function sendPhotoUploadedMessage(
 
 function createMessage(typeConvert, nextPhotoType) {
   if (nextPhotoType === "Foto Paspor") {
-    return `*${typeConvert}* telah berhasil diunggah. Mohon unggah *${nextPhotoType}* berikutnya.
+    return `*${typeConvert}* telah berhasil diunggah. Mohon unggah *${nextPhotoType}* beserta caption foto *${nextPhotoType}* untuk selanjutnya.
 
     ⚠ Jika Anda tidak memiliki Paspor dan ingin membuat Paspor dengan layanan kami, Anda dapat mengirimkan pesan dengan format: 
 - [Ketik: *!skip-foto paspor*]`;
   } else {
-    return `*${typeConvert}* telah berhasil diunggah. Mohon unggah *${nextPhotoType}* berikutnya.`;
+    return `*${typeConvert}* telah berhasil diunggah. Mohon unggah *${nextPhotoType}* beserta caption foto *${nextPhotoType}* untuk selanjutnya.`;
   }
 }
 
