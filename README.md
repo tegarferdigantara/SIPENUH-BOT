@@ -65,7 +65,7 @@ SIPENUH-BOT/
 
 1. Clone repository
 ```bash
-git clone https://github.com/tegarferdigantara/SIPENUH
+git clone https://github.com/tegarferdigantara/SIPENUH-BOT
 cd SIPENUH-BOT
 ```
 
